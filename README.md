@@ -1,8 +1,8 @@
 # HTTP router
 
-It is an adoption of [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter) router.
+It is an adoption of [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter) router optimized for serving thousands of routes.
 
-It is optimized for serving thousands of routes, including:
+Including:
  * Move handlers out of the tree to reduce memory consumption. 
  * Define one global handler for all valid routes.
  * Reduce pointers usage in the tree.
