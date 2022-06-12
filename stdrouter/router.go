@@ -105,7 +105,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	r.PageNotFoundHandler(rw, req)
 }
 
-func (r *Router) Insert(method, path string, handlerID uint64) error {
+func (r *Router) Add(method, path string, handlerID uint64) error {
 	methodIndex := methodIndexOf(method)
 	if methodIndex == -1 {
 		return fmt.Errorf("method not allowed")
@@ -127,7 +127,7 @@ func (r *Router) Insert(method, path string, handlerID uint64) error {
 	return nil
 }
 
-func (r *Router) Delete(method, path string) error {
+func (r *Router) Remove(method, path string) error {
 	methodIndex := methodIndexOf(method)
 	if methodIndex == -1 {
 		return fmt.Errorf("method not allowed")
