@@ -150,6 +150,10 @@ func (r *Router) Remove(method, path string) error {
 
 func (r *Router) getParams() *Params {
 	ps, _ := r.paramsPool.Get().(*Params)
+	if ps == nil {
+		return &Params{}
+	}
+
 	*ps = (*ps)[0:0] // reset slice
 	return ps
 }
