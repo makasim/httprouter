@@ -1,83 +1,136 @@
 package httprouter
 
 import (
-	"errors"
 	"fmt"
+
 	"github.com/makasim/httprouter/radix"
 	"github.com/savsgio/gotils"
+	"github.com/valyala/fasthttp"
 )
 
-var ErrPathNotFound = fmt.Errorf("path not found")
+var HandlerKeyUserValue = "fasthttprouter.handler_id"
 
 type Router struct {
-	tree radix.Tree
+	PageNotFoundHandler     fasthttp.RequestHandler
+	MethodNotAllowedHandler fasthttp.RequestHandler
+	GlobalHandler           fasthttp.RequestHandler
+	Handlers                map[uint64]fasthttp.RequestHandler
+
+	Trees []radix.Tree
 }
 
-func (r Router) Route(method, path []byte, kv func(n string, v interface{})) (uint64, error) {
-	if len(method) == 0 {
-		return 0, fmt.Errorf("method empty")
-	}
-	if len(path) == 0 {
-		return 0, fmt.Errorf("path empty")
-	}
+func New() *Router {
+	return &Router{
+		PageNotFoundHandler: func(ctx *fasthttp.RequestCtx) {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+		},
+		MethodNotAllowedHandler: func(ctx *fasthttp.RequestCtx) {
+			ctx.SetStatusCode(fasthttp.StatusMethodNotAllowed)
+		},
+		Handlers: make(map[uint64]fasthttp.RequestHandler),
 
-	path1 := "/" + gotils.B2S(method) + "/" + gotils.B2S(path)
-
-	handlerID := r.tree.Search(path1, kv)
-	if handlerID == 0 {
-		return 0, ErrPathNotFound
+		Trees: make([]radix.Tree, 9),
 	}
-
-	return handlerID, nil
 }
 
-func (r Router) Insert(method, path []byte, handlerID uint64) (Router, error) {
-	if len(method) == 0 {
-		return Router{}, fmt.Errorf("method empty")
-	}
-	if len(path) == 0 {
-		return Router{}, fmt.Errorf("path empty")
+func (r *Router) Handle(ctx *fasthttp.RequestCtx) {
+	i := r.methodIndexOf(gotils.B2S(ctx.Method()))
+	if i == -1 {
+		r.MethodNotAllowedHandler(ctx)
+		return
 	}
 
-	path1 := "/" + gotils.B2S(method) + "/" + gotils.B2S(path)
+	hID := r.Trees[i].Search(gotils.B2S(ctx.Path()), ctx.SetUserValue)
+	if hID == 0 {
+		r.PageNotFoundHandler(ctx)
+		return
+	}
+
+	ctx.SetUserValue(HandlerKeyUserValue, hID)
+
+	if h, ok := r.Handlers[hID]; ok {
+		h(ctx)
+		return
+	}
+
+	if r.GlobalHandler != nil {
+		r.GlobalHandler(ctx)
+		return
+	}
+
+	r.PageNotFoundHandler(ctx)
+}
+
+// Add adds a route for method and path to the router
+// It is not safe for concurrent use.
+// Add routes before using Handle or protect Add, Remove, Handle with mutex.
+func (r *Router) Add(method, path string, handlerID uint64) error {
+	methodIndex := r.methodIndexOf(method)
+	if methodIndex == -1 {
+		return fmt.Errorf("method not allowed")
+	}
+	if len(path) == 0 {
+		return fmt.Errorf("path empty")
+	}
 
 	var err error
-	tree := r.tree.Clone()
+	tree := r.Trees[methodIndex].Clone()
 
-	tree, err = tree.Insert(path1, handlerID)
+	tree, err = tree.Insert(path, handlerID)
 	if err != nil {
-		return Router{}, err
+		return err
 	}
 
-	return Router{tree: tree}, nil
+	r.Trees[methodIndex] = tree
+
+	return nil
 }
 
-func (r Router) Delete(method, path []byte) (Router, error) {
-	if len(method) == 0 {
-		return Router{}, fmt.Errorf("method empty")
+// Remove removes a route for method and path frmo the router
+// It is not safe for concurrent use.
+//Remove routes before using Handle or protect Add, Remove, Handle with mutex.
+func (r *Router) Remove(method, path string) error {
+	methodIndex := r.methodIndexOf(method)
+	if methodIndex == -1 {
+		return fmt.Errorf("method not allowed")
 	}
 	if len(path) == 0 {
-		return Router{}, fmt.Errorf("path empty")
+		return fmt.Errorf("path empty")
 	}
-
-	path1 := "/" + gotils.B2S(method) + "/" + gotils.B2S(path)
 
 	var err error
-	tree := r.tree.Clone()
+	tree := r.Trees[methodIndex].Clone()
 
-	tree, err = tree.Delete(path1)
-	if err != nil && !errors.Is(err, ErrPathNotFound) {
-		return Router{}, err
+	tree, err = tree.Delete(path)
+	if err != nil {
+		return err
 	}
 
-	return Router{tree: tree}, nil
+	r.Trees[methodIndex] = tree
+	return nil
 }
 
-// Tree could be used for debugging purpose
-func (r Router) Tree() radix.Tree {
-	return r.tree.Clone()
-}
+func (r *Router) methodIndexOf(method string) int {
+	switch method {
+	case fasthttp.MethodGet:
+		return 0
+	case fasthttp.MethodHead:
+		return 1
+	case fasthttp.MethodPost:
+		return 2
+	case fasthttp.MethodPut:
+		return 3
+	case fasthttp.MethodPatch:
+		return 4
+	case fasthttp.MethodDelete:
+		return 5
+	case fasthttp.MethodConnect:
+		return 6
+	case fasthttp.MethodOptions:
+		return 7
+	case fasthttp.MethodTrace:
+		return 8
+	}
 
-func (r Router) Count() int {
-	return r.tree.Count()
+	return -1
 }
