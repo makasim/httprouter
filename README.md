@@ -6,7 +6,9 @@ Including:
  * Move handlers out of the tree to reduce memory consumption. 
  * Define one global handler for all valid routes.
  * Reduce pointers usage in the tree.
- * Remove some original [features](https://github.com/julienschmidt/httprouter#features) because I did not need them.
+ * Support static and param routes (aka /foo/{bar}, /foo/bar).
+
+Note: Some original features are removed [features](https://github.com/julienschmidt/httprouter#features) because I did not need them.
 
 The package provides a router for [valyala/fasthttp](https://github.com/valyala/fasthttp) and Go's standard [net/http](https://pkg.go.dev/net/http).
 
