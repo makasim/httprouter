@@ -80,17 +80,7 @@ func (t Tree) Search(path string, kv func(n string, v interface{})) uint64 {
 		kv = func(n string, v interface{}) {}
 	}
 
-	if len(path) > len(t.root.path) {
-		if path[:len(t.root.path)] != t.root.path {
-			return 0
-		}
-
-		return t.root.Search(path[len(t.root.path):], kv)
-	} else if len(path) == len(t.root.path) {
-		return t.root.key
-	}
-
-	return 0
+	return t.root.Search(path, kv)
 }
 
 func (t Tree) Count() int {

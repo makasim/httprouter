@@ -2,8 +2,8 @@ package stdrouter
 
 import (
 	"fmt"
+	"github.com/julienschmidt/httprouter"
 	"net/http"
-	"strconv"
 	"sync"
 
 	"github.com/makasim/httprouter/radix"
@@ -11,8 +11,6 @@ import (
 )
 
 var HandlerKeyUserValue = "fasthttprouter.handler_id"
-
-type HandlerFunc func(http.ResponseWriter, *http.Request, Params)
 
 // Param is a single URL parameter, consisting of a key and a value.
 type Param struct {
@@ -39,8 +37,8 @@ func (ps Params) ByName(name string) string {
 type Router struct {
 	PageNotFoundHandler     http.HandlerFunc
 	MethodNotAllowedHandler http.HandlerFunc
-	GlobalHandler           HandlerFunc
-	Handlers                map[uint64]HandlerFunc
+	GlobalHandler           httprouter.Handle
+	Handlers                map[uint64]httprouter.Handle
 
 	Trees []radix.Tree
 
@@ -55,9 +53,15 @@ func New() *Router {
 		MethodNotAllowedHandler: func(rw http.ResponseWriter, _ *http.Request) {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 		},
-		Handlers: make(map[uint64]HandlerFunc),
+		Handlers: make(map[uint64]httprouter.Handle),
 
 		Trees: make([]radix.Tree, 9),
+
+		paramsPool: sync.Pool{
+			New: func() interface{} {
+				return new(Params)
+			},
+		},
 	}
 }
 
@@ -68,13 +72,17 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	ps := r.getParams()
+	var ps *Params
 	defer r.putParams(ps)
 
 	hID := r.Trees[i].Search(req.URL.Path, func(n string, v interface{}) {
 		v1, ok := v.(string)
 		if !ok {
 			return // skip
+		}
+
+		if ps == nil {
+			ps = r.getParams()
 		}
 
 		*ps = append(*ps, Param{
@@ -87,18 +95,18 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	*ps = append(*ps, Param{
-		Key:   HandlerKeyUserValue,
-		Value: strconv.FormatUint(hID, 10),
-	})
+	//*ps = append(*ps, Param{
+	//	Key:   HandlerKeyUserValue,
+	//	Value: strconv.FormatUint(hID, 10),
+	//})
 
 	if h, ok := r.Handlers[hID]; ok {
-		h(rw, req, *ps)
+		h(rw, req, nil)
 		return
 	}
 
 	if r.GlobalHandler != nil {
-		r.GlobalHandler(rw, req, *ps)
+		r.GlobalHandler(rw, req, nil)
 		return
 	}
 
@@ -115,7 +123,7 @@ func (r *Router) Add(method, path string, handlerID uint64) error {
 	}
 
 	var err error
-	tree := r.Trees[methodIndex].Clone()
+	tree := r.Trees[methodIndex]
 
 	tree, err = tree.Insert(path, handlerID)
 	if err != nil {
@@ -137,23 +145,20 @@ func (r *Router) Remove(method, path string) error {
 	}
 
 	var err error
-	tree := r.Trees[methodIndex].Clone()
+	tree := r.Trees[methodIndex]
 
 	tree, err = tree.Delete(path)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println(methodIndex)
 	r.Trees[methodIndex] = tree
 	return nil
 }
 
 func (r *Router) getParams() *Params {
 	ps, _ := r.paramsPool.Get().(*Params)
-	if ps == nil {
-		return &Params{}
-	}
-
 	*ps = (*ps)[0:0] // reset slice
 	return ps
 }

@@ -3,6 +3,7 @@ module github.com/makasim/httprouter
 go 1.18
 
 require (
+	github.com/julienschmidt/httprouter v1.3.0
 	github.com/savsgio/gotils v0.0.0-20200909101946-939aa3fc74fb
 	github.com/stretchr/testify v1.7.2
 	github.com/valyala/fasthttp v1.37.0

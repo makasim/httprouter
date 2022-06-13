@@ -2,10 +2,9 @@ package radix
 
 import (
 	"fmt"
+	"github.com/savsgio/gotils"
 	"strconv"
 	"strings"
-
-	"github.com/savsgio/gotils"
 )
 
 var ErrPathAlreadyTaken = fmt.Errorf("path already taken")
@@ -189,42 +188,89 @@ loop:
 	return n
 }
 
-func (n Node) Search(path string, kv func(n string, v interface{})) uint64 {
-	for _, child := range n.children {
-		switch child.kind {
-		case static:
-			switch {
-			case len(path) < len(child.path):
-				continue
-			case path == child.path:
-				return child.key
-			case path[:len(child.path)] == child.path:
-				return child.Search(path[len(child.path):], kv)
-			}
-		case param:
-			i := findSlashOrEnd(path)
-			switch {
-			case i > 0:
-				value := path[:i]
-				name := child.paramName()
-				path = path[i:]
-				if path == "" {
-					kv(name, gotils.S2B(value))
-					return child.key
-				}
+func (n *Node) Search(path string, kv func(n string, v interface{})) uint64 {
+	var n1 *Node
 
-				key := child.Search(path, kv)
-				if key > 0 {
-					kv(name, gotils.S2B(value))
-				}
-				return key
-			default:
+	switch n.kind {
+	case static:
+		if len(path) > len(n.path) {
+			if len(n.children) == 0 || n.path != path[:len(n.path)] {
 				return 0
 			}
-		}
-	}
 
-	return 0
+			i := 0
+			l := len(n.children)
+			hasChildParam := false
+			if n.children[0].kind == param {
+				i = 1
+				hasChildParam = true
+			}
+
+			path = path[len(n.path):]
+			for ; i < l; i++ {
+				n1 = &n.children[i]
+				if path[0] == n1.path[0] {
+					if key := n1.Search(path, kv); key > 0 {
+						return key
+					}
+					break
+				}
+			}
+
+			if hasChildParam {
+				return n.children[0].Search(path, kv)
+			}
+
+			return 0
+		} else if n.path == path {
+			return n.key
+		}
+
+		return 0
+	case param:
+		i := findSlashOrEnd(path)
+		switch {
+		case i > 0:
+			kv(n.paramName(), gotils.S2B(path[:i]))
+			path = path[i:]
+
+			if len(path) == 0 {
+				return n.key
+			}
+
+			if len(n.children) == 0 {
+				return 0
+			}
+
+			i := 0
+			l := len(n.children)
+			hasChildParam := false
+			if n.children[0].kind == param {
+				i = 1
+				hasChildParam = true
+			}
+
+			for ; i < l; i++ {
+				n1 := &n.children[i]
+				if path[0] == n1.path[0] {
+					if key := n1.Search(path, kv); key > 0 {
+						return key
+					}
+					break
+				}
+			}
+
+			if hasChildParam {
+				return n.children[0].Search(path, kv)
+			}
+
+			return 0
+		default:
+			return 0
+		}
+	default:
+		return 0
+	}
 }
 
 func (n Node) paramName() string {
@@ -240,12 +286,12 @@ func (n Node) paramNode() (Node, bool) {
 		return Node{kind: param}, false
 	}
 
-	last := n.children[len(n.children)-1]
-	if last.kind != param {
+	pn := n.children[0]
+	if pn.kind != param {
 		return Node{kind: param}, false
 	}
 
-	return last, true
+	return pn, true
 }
 
 func (n Node) setParamNode(pn Node) Node {
@@ -254,24 +300,25 @@ func (n Node) setParamNode(pn Node) Node {
 		return n
 	}
 
-	if n.children[len(n.children)-1].kind != param {
-		n.children = append(n.children, pn)
+	if n.children[0].kind != param {
+		n.children = append([]Node{pn}, n.children...)
 		return n
 	}
 
-	n.children[len(n.children)-1] = pn
+	n.children[0] = pn
 	return n
 }
 
 func (n Node) split(i int) Node {
-	cloneChild := n.Clone()
-	cloneChild.path = cloneChild.path[i:]
+	rightPath := n.path[:i]
+	leftPath := n.path[i:]
 
-	n.path = n.path[:i]
-	n.key = 0
-	n.children = append(n.children[:0], cloneChild)
+	n.path = leftPath
 
-	return n
+	return Node{
+		path:     rightPath,
+		children: []Node{n},
+	}
 }
 
 func (n Node) Count() int {
