@@ -4,13 +4,15 @@ It is an adoption of [julienschmidt/httprouter](https://github.com/julienschmidt
 
 Including:
  * Move handlers out of the tree to reduce memory consumption. 
- * Define one global handler for all valid routes.
- * Reduce pointers usage in the tree.
- * Support static and param routes (aka /foo/{bar}, /foo/bar).
+ * Define one global handler for all valid routes (15-20% less than httprouter).
+ * Reduce pointers usage in the tree (2-3x less load on GC than httprouter).
+ * Support mixing static and param routes (aka /foo/{bar}, /foo/bar).
+ * Provides a router for [valyala/fasthttp](https://github.com/valyala/fasthttp) and Go's [net/http](https://pkg.go.dev/net/http).
+ * Support httprouter compatible handlers.
 
-Note: Some original features are removed [features](https://github.com/julienschmidt/httprouter#features) because I did not need them.
+_*Warning*_: Some original [features](https://github.com/julienschmidt/httprouter#features) are not implemented.
 
-The package provides a router for [valyala/fasthttp](https://github.com/valyala/fasthttp) and Go's standard [net/http](https://pkg.go.dev/net/http).
+
 
 [Benchmarks](https://github.com/makasim/go-http-routing-benchmark/tree/makasim-http-router):
 ```
