@@ -16,7 +16,10 @@ _*Warning*_: Some original [features](https://github.com/julienschmidt/httproute
 
 [Benchmarks](https://github.com/makasim/go-http-routing-benchmark/tree/makasim-http-router):
 ```
-$gotest -run=xxx -bench=HttpRouter ./ -v 
+$ git clone git@github.com:makasim/go-http-routing-benchmark.git
+$ cd go-http-routing-benchmark
+& git checkout makasim-http-router
+$ go test -run=xxx -bench=HttpRouter ./ -v 
 #GithubAPI Routes: 203
    HttpRouter: 37088 Bytes
    MakasimHttpRouter: 36808 Bytes
