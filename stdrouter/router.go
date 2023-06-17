@@ -94,7 +94,10 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		})
 	})
 	if hID == 0 {
-		*ps = (*ps)[:0]
+		if ps != nil {
+			*ps = (*ps)[:0]
+		}
+
 		hID = r.Trees[methodAnyIndex].Search(req.URL.Path, func(n string, v interface{}) {
 			v1, ok := v.(string)
 			if !ok {

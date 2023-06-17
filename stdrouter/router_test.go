@@ -64,6 +64,9 @@ func TestRouter_Insert(main *testing.T) {
 
 		require.NoError(t, r.Add("TRACE", "/trace", 90))
 		require.NoError(t, r.Add("TRACE", "/TRACE/{param}/foo", 91))
+
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/trace", 100))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/TRACE/{param}/foo", 101))
 	})
 }
 
@@ -498,6 +501,34 @@ func TestRouter_Handle(main *testing.T) {
 		r.ServeHTTP(rw, req)
 		require.Equal(t, http.StatusMethodNotAllowed, rw.Result().StatusCode)
 		require.Equal(t, `custom_method_not_allowed_handler`, rw.Body.String())
+	})
+
+	main.Run("AnyMethod", func(t *testing.T) {
+		r := stdrouter.New()
+		r.Handlers[1] = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+			writer.WriteHeader(http.StatusOK)
+			_, err := writer.Write([]byte(`get_handler`))
+			require.NoError(t, err)
+		}
+		r.Handlers[2] = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+			writer.WriteHeader(http.StatusOK)
+			_, err := writer.Write([]byte(`any_handler`))
+			require.NoError(t, err)
+		}
+		require.NoError(t, r.Add("GET", "/apath", 1))
+		require.NoError(t, r.Add(`ANY`, "/apath", 2))
+
+		req := httptest.NewRequest(`GET`, `/apath`, http.NoBody)
+		rw := httptest.NewRecorder()
+		r.ServeHTTP(rw, req)
+		require.Equal(t, http.StatusOK, rw.Result().StatusCode)
+		require.Equal(t, `get_handler`, rw.Body.String())
+
+		req = httptest.NewRequest(`POST`, `/apath`, http.NoBody)
+		rw = httptest.NewRecorder()
+		r.ServeHTTP(rw, req)
+		require.Equal(t, http.StatusOK, rw.Result().StatusCode)
+		require.Equal(t, `any_handler`, rw.Body.String())
 	})
 }
 
