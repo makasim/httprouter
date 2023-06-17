@@ -2,9 +2,10 @@ package stdrouter
 
 import (
 	"fmt"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"sync"
+
+	"github.com/julienschmidt/httprouter"
 
 	"github.com/makasim/httprouter/radix"
 	"github.com/valyala/fasthttp"
@@ -152,7 +153,6 @@ func (r *Router) Remove(method, path string) error {
 		return err
 	}
 
-	fmt.Println(methodIndex)
 	r.Trees[methodIndex] = tree
 	return nil
 }
