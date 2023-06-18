@@ -1,6 +1,6 @@
 # HTTP router
 
-It is an adoption of [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter) router optimized for serving thousands of routes.
+It is an adoption of [julienschmidt/httprouter](https://github.com/julienschmidt/httprouter) router with deterministic handling order. Optimized for serving thousands of routes.
 
 Including:
  * Move handlers out of the tree to reduce memory consumption. 
