@@ -118,3 +118,32 @@ func dummyKV() func(n string, v interface{}) {
 	return func(n string, v interface{}) {
 	}
 }
+
+func FuzzTree_Insert(f *testing.F) {
+	f.Add(`/`)
+	f.Add(`/foo`)
+	f.Add(`/{param}`)
+	f.Add(`/foo/{param}`)
+	f.Add(`/foo/{param}/bar`)
+	f.Fuzz(func(t *testing.T, path string) {
+		tree := radix.NewTree()
+		tree, _ = tree.Insert(path, 1)
+	})
+}
+
+func FuzzTree_Search(f *testing.F) {
+	tree := radix.NewTree()
+	tree, _ = tree.Insert(`/`, 1)
+	tree, _ = tree.Insert(`/foo`, 2)
+	tree, _ = tree.Insert(`/{param}`, 3)
+	tree, _ = tree.Insert(`/foo/{param}`, 4)
+	tree, _ = tree.Insert(`/foo/{param}/bar`, 5)
+
+	f.Add(`/`)
+	f.Add(`/foo`)
+	f.Add(`/foo/bar`)
+	f.Fuzz(func(t *testing.T, path string) {
+		tree.Search(path, func(n string, v interface{}) {
+		})
+	})
+}
