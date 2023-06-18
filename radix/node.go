@@ -2,9 +2,10 @@ package radix
 
 import (
 	"fmt"
-	"github.com/savsgio/gotils"
 	"strconv"
 	"strings"
+
+	"github.com/savsgio/gotils"
 )
 
 var ErrPathAlreadyTaken = fmt.Errorf("path already taken")
@@ -231,14 +232,24 @@ func (n *Node) Search(path string, kv func(n string, v interface{})) uint64 {
 		i := findSlashOrEnd(path)
 		switch {
 		case i > 0:
-			kv(n.paramName(), gotils.S2B(path[:i]))
+			pn := n.paramName()
+			originI := i
+			originPath := path
 			path = path[i:]
 
 			if len(path) == 0 {
+				kv(pn, gotils.S2B(originPath[:originI]))
 				return n.key
 			}
 
 			if len(n.children) == 0 {
+				// wildcard
+				if pn[0] == '*' {
+					kv(pn, gotils.S2B(originPath))
+					return n.key
+				}
+
+				kv(pn, gotils.S2B(originPath[:originI]))
 				return 0
 			}
 
@@ -254,6 +265,7 @@ func (n *Node) Search(path string, kv func(n string, v interface{})) uint64 {
 				n1 := &n.children[i]
 				if path[0] == n1.path[0] {
 					if key := n1.Search(path, kv); key > 0 {
+						kv(pn, gotils.S2B(originPath[:originI]))
 						return key
 					}
 					break
@@ -261,7 +273,14 @@ func (n *Node) Search(path string, kv func(n string, v interface{})) uint64 {
 			}
 
 			if hasChildParam {
+				kv(pn, gotils.S2B(originPath[:originI]))
 				return n.children[0].Search(path, kv)
+			}
+
+			// wildcard
+			if pn[0] == '*' {
+				kv(pn, gotils.S2B(originPath))
+				return n.key
 			}
 
 			return 0
