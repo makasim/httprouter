@@ -2,15 +2,18 @@ package stdrouter
 
 import (
 	"fmt"
-	"github.com/julienschmidt/httprouter"
 	"net/http"
 	"sync"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/makasim/httprouter/radix"
-	"github.com/valyala/fasthttp"
 )
 
-var HandlerKeyUserValue = "fasthttprouter.handler_id"
+var HandlerKeyUserValue = "stdprouter.handler_id"
+
+const MethodAny = "ANY"
+const methodAnyIndex = 9
 
 // Param is a single URL parameter, consisting of a key and a value.
 type Param struct {
@@ -55,7 +58,7 @@ func New() *Router {
 		},
 		Handlers: make(map[uint64]httprouter.Handle),
 
-		Trees: make([]radix.Tree, 9),
+		Trees: make([]radix.Tree, 10),
 
 		paramsPool: sync.Pool{
 			New: func() interface{} {
@@ -91,14 +94,31 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		})
 	})
 	if hID == 0 {
-		r.PageNotFoundHandler(rw, req)
-		return
-	}
+		if ps != nil {
+			*ps = (*ps)[:0]
+		}
 
-	//*ps = append(*ps, Param{
-	//	Key:   HandlerKeyUserValue,
-	//	Value: strconv.FormatUint(hID, 10),
-	//})
+		hID = r.Trees[methodAnyIndex].Search(req.URL.Path, func(n string, v interface{}) {
+			v1, ok := v.(string)
+			if !ok {
+				return // skip
+			}
+
+			if ps == nil {
+				ps = r.getParams()
+			}
+
+			*ps = append(*ps, Param{
+				Key:   n,
+				Value: v1,
+			})
+		})
+
+		if hID == 0 {
+			r.PageNotFoundHandler(rw, req)
+			return
+		}
+	}
 
 	if h, ok := r.Handlers[hID]; ok {
 		h(rw, req, nil)
@@ -152,7 +172,6 @@ func (r *Router) Remove(method, path string) error {
 		return err
 	}
 
-	fmt.Println(methodIndex)
 	r.Trees[methodIndex] = tree
 	return nil
 }
@@ -171,24 +190,26 @@ func (r *Router) putParams(ps *Params) {
 
 func methodIndexOf(method string) int {
 	switch method {
-	case fasthttp.MethodGet:
+	case http.MethodGet:
 		return 0
-	case fasthttp.MethodHead:
+	case http.MethodHead:
 		return 1
-	case fasthttp.MethodPost:
+	case http.MethodPost:
 		return 2
-	case fasthttp.MethodPut:
+	case http.MethodPut:
 		return 3
-	case fasthttp.MethodPatch:
+	case http.MethodPatch:
 		return 4
-	case fasthttp.MethodDelete:
+	case http.MethodDelete:
 		return 5
-	case fasthttp.MethodConnect:
+	case http.MethodConnect:
 		return 6
-	case fasthttp.MethodOptions:
+	case http.MethodOptions:
 		return 7
-	case fasthttp.MethodTrace:
+	case http.MethodTrace:
 		return 8
+	case MethodAny:
+		return methodAnyIndex
 	}
 
 	return -1
