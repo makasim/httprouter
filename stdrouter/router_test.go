@@ -7,11 +7,54 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/makasim/httprouter/stdrouter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRouter_AddHandler(main *testing.T) {
+	main.Run("OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		h1ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		h2ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		h3ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(1), h1ID)
+		require.Equal(t, stdrouter.HandlerID(2), h2ID)
+		require.Equal(t, stdrouter.HandlerID(3), h3ID)
+
+		r.RemoveHandler(h2ID)
+
+		h4ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(2), h4ID)
+
+		h5ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(4), h5ID)
+	})
+
+	main.Run("Nil", func(t *testing.T) {
+		r := stdrouter.New()
+
+		require.Panics(t, func() {
+			r.AddHandler(nil)
+		})
+	})
+}
 
 func TestRouter_Insert(main *testing.T) {
 	main.Run("MethodEmpty", func(t *testing.T) {
@@ -426,9 +469,9 @@ func TestRouter_Handle(main *testing.T) {
 			},
 		}
 
-		r.GlobalHandler = func(rw http.ResponseWriter, req *http.Request, params httprouter.Params) {
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
 			rw.WriteHeader(http.StatusOK)
-		}
+		})
 
 		for _, tt := range tests {
 			tt := tt
@@ -464,18 +507,18 @@ func TestRouter_Handle(main *testing.T) {
 			_, err := writer.Write([]byte(`custom_method_not_allowed_handler`))
 			require.NoError(t, err)
 		}
-		r.Handlers[123] = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		h1ID := r.AddHandler(stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
 			writer.WriteHeader(http.StatusOK)
 			_, err := writer.Write([]byte(`custom_handler`))
 			require.NoError(t, err)
-		}
-		r.GlobalHandler = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		}))
+		r.GlobalHandler = stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
 			writer.WriteHeader(http.StatusOK)
 			_, err := writer.Write([]byte(`custom_global_handler`))
 			require.NoError(t, err)
-		}
+		})
 
-		require.NoError(t, r.Add("GET", "/get/123", 123))
+		require.NoError(t, r.Add("GET", "/get/123", h1ID))
 		require.NoError(t, r.Add("GET", "/get/321", 321))
 
 		req := httptest.NewRequest(`GET`, `/get/123`, http.NoBody)
@@ -505,18 +548,18 @@ func TestRouter_Handle(main *testing.T) {
 
 	main.Run("AnyMethod", func(t *testing.T) {
 		r := stdrouter.New()
-		r.Handlers[1] = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		h1ID := r.AddHandler(stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
 			writer.WriteHeader(http.StatusOK)
 			_, err := writer.Write([]byte(`get_handler`))
 			require.NoError(t, err)
-		}
-		r.Handlers[2] = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		}))
+		h2ID := r.AddHandler(stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
 			writer.WriteHeader(http.StatusOK)
 			_, err := writer.Write([]byte(`any_handler`))
 			require.NoError(t, err)
-		}
-		require.NoError(t, r.Add("GET", "/apath", 1))
-		require.NoError(t, r.Add(`ANY`, "/apath", 2))
+		}))
+		require.NoError(t, r.Add("GET", "/apath", h1ID))
+		require.NoError(t, r.Add(`ANY`, "/apath", h2ID))
 
 		req := httptest.NewRequest(`GET`, `/apath`, http.NoBody)
 		rw := httptest.NewRecorder()
@@ -534,9 +577,9 @@ func TestRouter_Handle(main *testing.T) {
 
 func TestRouter_Delete(t *testing.T) {
 	r := stdrouter.New()
-	r.GlobalHandler = func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+	r.GlobalHandler = stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
 		writer.WriteHeader(http.StatusOK)
-	}
+	})
 
 	require.NoError(t, r.Add("GET", "/foo", 1))
 	require.NoError(t, r.Add("POST", "/foo/{bar}", 2))

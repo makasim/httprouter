@@ -1,33 +1,33 @@
 package stdrouter
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/makasim/httprouter/radix"
 )
 
-var HandlerKeyUserValue = "stdprouter.handler_id"
+type Handler interface {
+	ServerHTTP(http.ResponseWriter, *http.Request, Params)
+}
 
-const MethodAny = "ANY"
-const methodAnyIndex = 9
+type HandlerFunc func(http.ResponseWriter, *http.Request, Params)
 
-// Param is a single URL parameter, consisting of a key and a value.
+func (f HandlerFunc) ServerHTTP(rw http.ResponseWriter, r *http.Request, p Params) {
+	f(rw, r, p)
+}
+
+type HandlerID int
+
 type Param struct {
 	Key   string
 	Value string
 }
 
-// Params is a Param-slice, as returned by the router.
-// The slice is ordered, the first URL parameter is also the first slice value.
-// It is therefore safe to read values by the index.
 type Params []Param
 
-// ByName returns the value of the first Param which key matches the given name.
-// If no matching Param is found, an empty string is returned.
 func (ps Params) ByName(name string) string {
 	for _, p := range ps {
 		if p.Key == name {
@@ -37,11 +37,33 @@ func (ps Params) ByName(name string) string {
 	return ""
 }
 
+type paramsKey struct{}
+
+var ParamsKey = paramsKey{}
+
+// ParamsFromContext pulls the URL parameters from a request context,
+// or returns nil if none are present.
+func ParamsFromContext(ctx context.Context) Params {
+	p, ok := ctx.Value(ParamsKey).(Params)
+	if !ok {
+		return Params{}
+	}
+
+	return p
+}
+
+var HandlerKeyUserValue = "stdprouter.handler_id"
+
+const MethodAny = "ANY"
+const methodAnyIndex = 9
+
 type Router struct {
 	PageNotFoundHandler     http.HandlerFunc
 	MethodNotAllowedHandler http.HandlerFunc
-	GlobalHandler           httprouter.Handle
-	Handlers                map[uint64]httprouter.Handle
+	GlobalHandler           Handler
+
+	handlers       []Handler
+	freeHandlerIds []HandlerID
 
 	Trees []radix.Tree
 
@@ -56,9 +78,11 @@ func New() *Router {
 		MethodNotAllowedHandler: func(rw http.ResponseWriter, _ *http.Request) {
 			rw.WriteHeader(http.StatusMethodNotAllowed)
 		},
-		Handlers: make(map[uint64]httprouter.Handle),
 
 		Trees: make([]radix.Tree, 10),
+
+		handlers:       make([]Handler, 1), // 0 is nil handler
+		freeHandlerIds: make([]HandlerID, 0),
 
 		paramsPool: sync.Pool{
 			New: func() interface{} {
@@ -75,17 +99,13 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	var ps *Params
+	ps := r.getParams()
 	defer r.putParams(ps)
 
 	hID := r.Trees[i].Search(req.URL.Path, func(n string, v interface{}) {
 		v1, ok := v.(string)
 		if !ok {
 			return // skip
-		}
-
-		if ps == nil {
-			ps = r.getParams()
 		}
 
 		*ps = append(*ps, Param{
@@ -104,10 +124,6 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				return // skip
 			}
 
-			if ps == nil {
-				ps = r.getParams()
-			}
-
 			*ps = append(*ps, Param{
 				Key:   n,
 				Value: v1,
@@ -120,20 +136,60 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if h, ok := r.Handlers[hID]; ok {
-		h(rw, req, nil)
-		return
+	maxHID := len(r.handlers) - 1
+	if int(hID) <= maxHID {
+		if h := r.handlers[int(hID)]; h != nil {
+			h.ServerHTTP(rw, req, *ps)
+			return
+		}
 	}
 
 	if r.GlobalHandler != nil {
-		r.GlobalHandler(rw, req, nil)
+
+		r.GlobalHandler.ServerHTTP(rw, req, *ps)
 		return
 	}
 
 	r.PageNotFoundHandler(rw, req)
 }
 
-func (r *Router) Add(method, path string, handlerID uint64) error {
+func (r *Router) AddHandler(handler Handler) HandlerID {
+	if handler == nil {
+		panic("handler is nil")
+	}
+
+	if len(r.freeHandlerIds) > 0 {
+		id := r.freeHandlerIds[len(r.freeHandlerIds)-1]
+		r.freeHandlerIds = r.freeHandlerIds[:len(r.freeHandlerIds)-1]
+
+		r.handlers[id] = handler
+
+		return id
+	}
+
+	id := len(r.handlers)
+	r.handlers = append(r.handlers, handler)
+
+	return HandlerID(id)
+}
+
+func (r *Router) RemoveHandler(hID HandlerID) {
+	r.handlers[hID] = nil
+	r.freeHandlerIds = append(r.freeHandlerIds, hID)
+}
+
+func (r *Router) AddStdHandler(handler http.Handler) HandlerID {
+	return r.AddHandler(HandlerFunc(func(rw http.ResponseWriter, req *http.Request, _ Params) {
+		handler.ServeHTTP(rw, req)
+	}))
+}
+
+func (r *Router) RegisterHandler(method, path string, handler Handler) error {
+	hID := r.AddHandler(handler)
+	return r.Add(method, path, hID)
+}
+
+func (r *Router) Add(method, path string, handlerID HandlerID) error {
 	methodIndex := methodIndexOf(method)
 	if methodIndex == -1 {
 		return fmt.Errorf("method not allowed")
@@ -145,7 +201,7 @@ func (r *Router) Add(method, path string, handlerID uint64) error {
 	var err error
 	tree := r.Trees[methodIndex]
 
-	tree, err = tree.Insert(path, handlerID)
+	tree, err = tree.Insert(path, uint64(handlerID))
 	if err != nil {
 		return err
 	}
