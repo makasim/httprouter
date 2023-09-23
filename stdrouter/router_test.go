@@ -12,6 +12,50 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRouter_AddHandler(main *testing.T) {
+	main.Run("OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		h1ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		h2ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		h3ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(1), h1ID)
+		require.Equal(t, stdrouter.HandlerID(2), h2ID)
+		require.Equal(t, stdrouter.HandlerID(3), h3ID)
+
+		r.RemoveHandler(h2ID)
+
+		h4ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(2), h4ID)
+
+		h5ID := r.AddHandler(stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		}))
+
+		require.Equal(t, stdrouter.HandlerID(4), h5ID)
+	})
+
+	main.Run("Nil", func(t *testing.T) {
+		r := stdrouter.New()
+
+		require.Panics(t, func() {
+			r.AddHandler(nil)
+		})
+	})
+}
+
 func TestRouter_Insert(main *testing.T) {
 	main.Run("MethodEmpty", func(t *testing.T) {
 		r := stdrouter.New()

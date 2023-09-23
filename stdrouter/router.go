@@ -154,6 +154,10 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) AddHandler(handler Handler) HandlerID {
+	if handler == nil {
+		panic("handler is nil")
+	}
+
 	if len(r.freeHandlerIds) > 0 {
 		id := r.freeHandlerIds[len(r.freeHandlerIds)-1]
 		r.freeHandlerIds = r.freeHandlerIds[:len(r.freeHandlerIds)-1]
