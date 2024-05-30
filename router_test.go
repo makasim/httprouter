@@ -2,10 +2,12 @@ package httprouter_test
 
 import (
 	"fmt"
+	"net/http"
+	"testing"
+
 	"github.com/makasim/httprouter"
 	"github.com/stretchr/testify/assert"
 	"github.com/valyala/fasthttp"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )
@@ -95,6 +97,10 @@ func TestRouter_Handle(main *testing.T) {
 		require.NoError(t, r.Add("TRACE", "/trace0", 81))
 		require.NoError(t, r.Add("TRACE", "/trace1", 82))
 		require.NoError(t, r.Add("TRACE", "/trace1/{param}", 83))
+
+		// wildcard param test
+		require.NoError(t, r.Add("POST", "/POST/foo/bar/{*barparam}", 110))
+		require.NoError(t, r.Add("POST", "/POST/foo/{*fooparam}", 111))
 
 		type test struct {
 			status    int
@@ -411,7 +417,26 @@ func TestRouter_Handle(main *testing.T) {
 				status: fasthttp.StatusNotFound,
 				params: map[string]interface{}{},
 			},
-
+			{
+				method:    "POST",
+				path:      "/POST/foo/bar/match/by/wildcard",
+				status:    fasthttp.StatusOK,
+				handlerID: 110,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(110),
+					"*barparam":                    []byte("match/by/wildcard"),
+				},
+			},
+			{
+				method:    "POST",
+				path:      "/POST/foo/match/by/wildcard",
+				status:    fasthttp.StatusOK,
+				handlerID: 111,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(111),
+					"*fooparam":                    []byte("match/by/wildcard"),
+				},
+			},
 			{
 				method: "UNSUPPORTED",
 				path:   "/method/unsupported",
@@ -520,4 +545,88 @@ func TestRouter_Remove(t *testing.T) {
 	ctx.Request.URI().SetPath(`/foo`)
 	r.Handle(ctx)
 	require.Equal(t, fasthttp.StatusNotFound, ctx.Response.StatusCode())
+}
+
+func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
+	main.Run("Route", func(t *testing.T) {
+		r := httprouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/bar/0", 1))
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/bar/1", 2))
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/bar/{param}", 3))
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/bar/rpc.{*param}", 4))
+
+		type test struct {
+			status    int
+			params    map[string]interface{}
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/0",
+				status:    http.StatusOK,
+				handlerID: 1,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(1),
+				},
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/1",
+				status:    http.StatusOK,
+				handlerID: 2,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(2),
+				},
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/foobar",
+				status:    http.StatusOK,
+				handlerID: 3,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(3),
+					"param":                        []byte("foobar"),
+				},
+			},
+
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/rpc.v4",
+				status:    http.StatusOK,
+				handlerID: 4,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(4),
+					"*param":                       []byte("v4"),
+				},
+			},
+		}
+
+		r.GlobalHandler = func(ctx *fasthttp.RequestCtx) {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				ctx := &fasthttp.RequestCtx{}
+				ctx.Request.Header.SetMethod(tt.method)
+				ctx.Request.URI().SetPath(tt.path)
+				r.Handle(ctx)
+
+				params := make(map[string]interface{})
+				ctx.VisitUserValues(func(bytes []byte, i interface{}) {
+					params[string(bytes)] = i
+				})
+
+				assert.Equal(t, tt.status, ctx.Response.StatusCode())
+				assert.Equal(t, tt.params, params)
+			})
+		}
+	})
 }
