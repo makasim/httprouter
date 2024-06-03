@@ -129,21 +129,13 @@ func (n Node) Insert(path string, key uint64) Node {
 			return n
 		}
 
-		if len(n.children) > 0 {
-			n.children = append(n.children, Node{
-				path: path[:start],
-				children: []Node{
-					updateParamNode(Node{kind: param}, path[start:], key),
-				},
-			})
-		} else {
-			n.children = []Node{{
-				path: path[:start],
-				children: []Node{
-					updateParamNode(Node{kind: param}, path[start:], key),
-				},
-			}}
-		}
+		n.children = append(n.children, Node{
+			path: path[:start],
+			children: []Node{
+				updateParamNode(Node{kind: param}, path[start:], key),
+			},
+		})
+
 		return n
 	}
 
