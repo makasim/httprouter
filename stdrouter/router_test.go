@@ -110,6 +110,92 @@ func TestRouter_Insert(main *testing.T) {
 
 		require.NoError(t, r.Add(stdrouter.MethodAny, "/trace", 100))
 		require.NoError(t, r.Add(stdrouter.MethodAny, "/TRACE/{param}/foo", 101))
+
+		// wildcard param test
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/{*path}", 110))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/ANY/{*param}", 111))
+	})
+}
+
+func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
+	main.Run("Route", func(t *testing.T) {
+		r := stdrouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/bar/0", 1))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/bar/1", 2))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/bar/{param}", 3))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/bar/rpc.{*param}", 4))
+
+		type test struct {
+			status    int
+			params    map[string]interface{}
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/0",
+				status:    http.StatusOK,
+				handlerID: 1,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(1),
+				},
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/1",
+				status:    http.StatusOK,
+				handlerID: 2,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(2),
+					"path":                        "bar/1",
+				},
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/foobar",
+				status:    http.StatusOK,
+				handlerID: 3,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(3),
+					"param":                       "foobar",
+				},
+			},
+
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/rpc.v4",
+				status:    http.StatusOK,
+				handlerID: 4,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(4),
+					"param":                       "rpc.v4",
+				},
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				req := &http.Request{}
+				req.Method = tt.method
+				req.URL = &url.URL{}
+				req.URL.Path = tt.path
+				rw := &httptest.ResponseRecorder{}
+
+				r.ServeHTTP(rw, req)
+
+				assert.Equal(t, tt.status, rw.Result().StatusCode)
+			})
+		}
 	})
 }
 
@@ -144,6 +230,12 @@ func TestRouter_Handle(main *testing.T) {
 		require.NoError(t, r.Add("TRACE", "/trace0", 81))
 		require.NoError(t, r.Add("TRACE", "/trace1", 82))
 		require.NoError(t, r.Add("TRACE", "/trace1/{param}", 83))
+
+		// wildcard param test
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/ANY/foo/car", 112))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/ANY/foo/bar/{*barparam}", 111))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/ANY/foo/{*fooparam}", 110))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/ANY/{*rootparam}", 113))
 
 		type test struct {
 			status    int
@@ -460,7 +552,30 @@ func TestRouter_Handle(main *testing.T) {
 				status: http.StatusNotFound,
 				params: map[string]interface{}{},
 			},
-
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/match/by/wildcard",
+				status:    http.StatusOK,
+				handlerID: 110,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/bar/match/by/wildcard",
+				status:    http.StatusOK,
+				handlerID: 111,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/bar/car",
+				status:    http.StatusOK,
+				handlerID: 112,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/root",
+				status:    http.StatusOK,
+				handlerID: 113,
+			},
 			{
 				method: "UNSUPPORTED",
 				path:   "/method/unsupported",

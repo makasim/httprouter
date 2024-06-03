@@ -499,7 +499,7 @@ func TestNode_InsertDynamic(main *testing.T) {
 		},
 		"NewParamChildChild3": {
 			node: Node{
-				path: "/bar",
+				path: "/bar/",
 				children: []Node{
 					{
 						path: "1",
@@ -514,17 +514,12 @@ func TestNode_InsertDynamic(main *testing.T) {
 			insertPath: "/bar/{param}",
 			insertKey:  3,
 			expected: Node{
-				path: "/bar",
+				path: "/bar/",
 				children: []Node{
 					{
-						path: "/",
-						children: []Node{
-							{
-								kind: param,
-								path: "{param}",
-								key:  3,
-							},
-						},
+						kind: param,
+						path: "{param}",
+						key:  3,
 					},
 					{
 						path: "1",
