@@ -118,7 +118,7 @@ func TestRouter_Insert(main *testing.T) {
 }
 
 func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
-	main.Run("Route", func(t *testing.T) {
+	main.Run("WhenParametrizedRouteAfterSimpleRoutes_OK", func(t *testing.T) {
 		r := stdrouter.New()
 
 		// wildcard param test
@@ -174,6 +174,62 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 				params: map[string]interface{}{
 					stdrouter.HandlerKeyUserValue: uint64(4),
 					"param":                       "rpc.v4",
+				},
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				req := &http.Request{}
+				req.Method = tt.method
+				req.URL = &url.URL{}
+				req.URL.Path = tt.path
+				rw := &httptest.ResponseRecorder{}
+
+				r.ServeHTTP(rw, req)
+
+				assert.Equal(t, tt.status, rw.Result().StatusCode)
+			})
+		}
+	})
+	main.Run("June2024_Bug", func(t *testing.T) {
+		r := stdrouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/api/{*path}", 1))
+		require.NoError(t, r.Add(stdrouter.MethodAny, "/api/v1/foo/bar", 2))
+
+		type test struct {
+			status    int
+			params    map[string]interface{}
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/api/v1/foo/bar",
+				status:    http.StatusOK,
+				handlerID: 1,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(1),
+				},
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/api/something/else",
+				status:    http.StatusOK,
+				handlerID: 2,
+				params: map[string]interface{}{
+					stdrouter.HandlerKeyUserValue: uint64(2),
+					"path":                        "something/else",
 				},
 			},
 		}
