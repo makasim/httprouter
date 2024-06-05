@@ -1,4 +1,4 @@
-module github.com/SuddenGunter/httprouter
+module github.com/makasim/httprouter
 
 go 1.18
 
