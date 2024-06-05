@@ -548,7 +548,7 @@ func TestRouter_Remove(t *testing.T) {
 }
 
 func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
-	main.Run("Route", func(t *testing.T) {
+	main.Run("WhenParametrizedRouteAfterSimpleRoutes_OK", func(t *testing.T) {
 		r := httprouter.New()
 
 		// wildcard param test
@@ -604,6 +604,118 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 					httprouter.HandlerKeyUserValue: uint64(4),
 					"*param":                       []byte("v4"),
 				},
+			},
+		}
+
+		r.GlobalHandler = func(ctx *fasthttp.RequestCtx) {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				ctx := &fasthttp.RequestCtx{}
+				ctx.Request.Header.SetMethod(tt.method)
+				ctx.Request.URI().SetPath(tt.path)
+				r.Handle(ctx)
+
+				params := make(map[string]interface{})
+				ctx.VisitUserValues(func(bytes []byte, i interface{}) {
+					params[string(bytes)] = i
+				})
+
+				assert.Equal(t, tt.status, ctx.Response.StatusCode())
+				assert.Equal(t, tt.params, params)
+			})
+		}
+	})
+	main.Run("WhenParametrizedRouteRegisteredBefore_OK", func(t *testing.T) {
+		r := httprouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/api/{*path}", 1))
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/api/v1/foo/bar", 2))
+
+		type test struct {
+			status    int
+			params    map[string]interface{}
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method: "POST", // can be any method
+				path:   "/api/v1/foo/bar",
+				status: http.StatusOK,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(2),
+				},
+			},
+			{
+				method: "POST", // can be any method
+				path:   "/api/something/else",
+				status: http.StatusOK,
+				params: map[string]interface{}{
+					"*path":                        []byte("something/else"),
+					httprouter.HandlerKeyUserValue: uint64(1)},
+			},
+		}
+
+		r.GlobalHandler = func(ctx *fasthttp.RequestCtx) {
+			ctx.SetStatusCode(fasthttp.StatusOK)
+		}
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				ctx := &fasthttp.RequestCtx{}
+				ctx.Request.Header.SetMethod(tt.method)
+				ctx.Request.URI().SetPath(tt.path)
+				r.Handle(ctx)
+
+				params := make(map[string]interface{})
+				ctx.VisitUserValues(func(bytes []byte, i interface{}) {
+					params[string(bytes)] = i
+				})
+
+				assert.Equal(t, tt.status, ctx.Response.StatusCode())
+				assert.Equal(t, tt.params, params)
+			})
+		}
+	})
+	main.Run("WhenParametrizedRouteRegisteredAfter_OK", func(t *testing.T) {
+		r := httprouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/api/v1/foo/bar", 1))
+		require.NoError(t, r.Add(fasthttp.MethodPost, "/api/{*path}", 2))
+
+		type test struct {
+			status    int
+			params    map[string]interface{}
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method: "POST", // can be any method
+				path:   "/api/v1/foo/bar",
+				status: http.StatusOK,
+				params: map[string]interface{}{
+					httprouter.HandlerKeyUserValue: uint64(1),
+				},
+			},
+			{
+				method: "POST", // can be any method
+				path:   "/api/something/else",
+				status: http.StatusOK,
+				params: map[string]interface{}{
+					"*path":                        []byte("something/else"),
+					httprouter.HandlerKeyUserValue: uint64(2)},
 			},
 		}
 

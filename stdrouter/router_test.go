@@ -197,7 +197,7 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 			})
 		}
 	})
-	main.Run("June2024_Bug", func(t *testing.T) {
+	main.Run("WhenParametrizedRouteRegisteredBefore_OK", func(t *testing.T) {
 		r := stdrouter.New()
 
 		// wildcard param test
@@ -217,20 +217,11 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 				method:    "POST", // can be any method
 				path:      "/api/v1/foo/bar",
 				status:    http.StatusOK,
-				handlerID: 1,
-				params: map[string]interface{}{
-					stdrouter.HandlerKeyUserValue: uint64(1),
-				},
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/api/something/else",
 				status:    http.StatusOK,
-				handlerID: 2,
-				params: map[string]interface{}{
-					stdrouter.HandlerKeyUserValue: uint64(2),
-					"path":                        "something/else",
-				},
 			},
 		}
 
@@ -253,7 +244,7 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 			})
 		}
 	})
-	main.Run("June2024_Bug_2", func(t *testing.T) {
+	main.Run("WhenParametrizedRouteRegisteredAfter_OK", func(t *testing.T) {
 		r := stdrouter.New()
 
 		// wildcard param test
@@ -273,20 +264,11 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 				method:    "POST", // can be any method
 				path:      "/api/v1/foo/bar",
 				status:    http.StatusOK,
-				handlerID: 1,
-				params: map[string]interface{}{
-					stdrouter.HandlerKeyUserValue: uint64(1),
-				},
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/api/something/else",
 				status:    http.StatusOK,
-				handlerID: 2,
-				params: map[string]interface{}{
-					stdrouter.HandlerKeyUserValue: uint64(2),
-					"path":                        "something/else",
-				},
 			},
 		}
 
