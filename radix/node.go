@@ -139,13 +139,11 @@ func (n Node) Insert(path string, key uint64) Node {
 		return n
 	}
 
-	n.children = append([]Node{
-		{
-			path:     path,
-			key:      key,
-			children: nil,
-		},
-	}, n.children...)
+	n.children = append(n.children, Node{
+		path:     path,
+		key:      key,
+		children: nil,
+	})
 	return n
 }
 

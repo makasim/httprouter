@@ -35,8 +35,8 @@ func TestNode_InsertStatic(main *testing.T) {
 				path: "/f",
 				key:  0,
 				children: []Node{
-					{path: "aa", key: 2},
 					{path: "oo", key: 1},
+					{path: "aa", key: 2},
 				},
 			},
 		},
@@ -74,9 +74,9 @@ func TestNode_InsertStatic(main *testing.T) {
 			expected: Node{
 				path: "/",
 				children: []Node{
-					{path: "ololo", key: 3},
 					{path: "foo", key: 1},
 					{path: "bar", key: 2},
+					{path: "ololo", key: 3},
 				},
 			},
 		},
@@ -102,12 +102,12 @@ func TestNode_InsertStatic(main *testing.T) {
 						key:  0,
 						children: []Node{
 							{
-								path: "aa",
-								key:  2,
-							},
-							{
 								path: "oo",
 								key:  1,
+							},
+							{
+								path: "aa",
+								key:  2,
 							},
 						},
 					},
@@ -182,8 +182,8 @@ func TestNode_InsertStatic(main *testing.T) {
 					{
 						path: "1",
 						children: []Node{
-							{path: "1", key: 1011},
 							{path: "0", key: 1010},
+							{path: "1", key: 1011},
 						},
 					},
 					{
@@ -220,9 +220,9 @@ func TestNode_InsertStatic(main *testing.T) {
 					{
 						path: "1",
 						children: []Node{
-							{path: "1", key: 1011},
 							{path: "0", key: 1010},
 							{path: "2", key: 1012},
+							{path: "1", key: 1011},
 						},
 					},
 					{
@@ -375,13 +375,13 @@ func TestNode_InsertDynamic(main *testing.T) {
 				key:  0,
 				children: []Node{
 					{
-						path: "fo",
-						key:  2,
-					},
-					{
 						kind: param,
 						path: "{foo}",
 						key:  1,
+					},
+					{
+						path: "fo",
+						key:  2,
 					},
 				},
 			},
