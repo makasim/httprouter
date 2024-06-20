@@ -998,6 +998,20 @@ func TestRouter_FindHandler(main *testing.T) {
 		_, error := r.FindHandler("GET", "/")
 		assert.EqualError(t, error, "path / not found")
 	})
+	main.Run("FindHandler_GlobalHandler", func(t *testing.T) {
+		r := stdrouter.New()
+		r.Add(stdrouter.MethodAny, "/bar", 1)
+		r.GlobalHandler = stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
+			writer.WriteHeader(http.StatusOK)
+		})
+		h, error := r.FindHandler("GET", "/bar")
+		require.NoError(t, error)
+
+		responseRecorder := httptest.NewRecorder()
+		request := httptest.NewRequest("GET", "/bar", http.NoBody)
+		h.ServerHTTP(responseRecorder, request, nil)
+		assert.Equal(t, http.StatusOK, responseRecorder.Result().StatusCode)
+	})
 	main.Run("FindHandler_OK", func(t *testing.T) {
 		r := stdrouter.New()
 		mockHandler := func(resp string) stdrouter.Handler {
