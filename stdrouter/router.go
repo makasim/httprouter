@@ -92,6 +92,10 @@ func New() *Router {
 	}
 }
 
+func (r *Router) GetHandler(hID HandlerID) Handler {
+	return r.handlers[hID]
+}
+
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	i := methodIndexOf(req.Method)
 	if i == -1 {
