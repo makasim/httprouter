@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/SuddenGunter/httprouter/stdrouter"
 	"github.com/makasim/httprouter/radix"
 )
 
@@ -174,7 +173,7 @@ func (r *Router) AddHandler(handler Handler) HandlerID {
 	return HandlerID(id)
 }
 
-func (r *Router) FindHandler(path, method string) (stdrouter.Handler, error) {
+func (r *Router) FindHandler(path, method string) (Handler, error) {
 	i := methodIndexOf(method)
 	if i == -1 {
 		return nil, fmt.Errorf("unsupported method %v", method)
