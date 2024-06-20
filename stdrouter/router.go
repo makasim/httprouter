@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/SuddenGunter/httprouter/stdrouter"
 	"github.com/makasim/httprouter/radix"
 )
 
@@ -171,6 +172,35 @@ func (r *Router) AddHandler(handler Handler) HandlerID {
 	r.handlers = append(r.handlers, handler)
 
 	return HandlerID(id)
+}
+
+func (r *Router) FindHandler(path, method string) (stdrouter.Handler, error) {
+	i := methodIndexOf(method)
+	if i == -1 {
+		return nil, fmt.Errorf("unsupported method %v", method)
+	}
+
+	hID := r.Trees[i].Search(path, func(n string, v interface{}) {})
+	if hID == 0 && i != methodAnyIndex {
+		hID = r.Trees[methodAnyIndex].Search(path, func(n string, v interface{}) {})
+
+		if hID == 0 {
+			return nil, fmt.Errorf("path %v not found", path)
+		}
+	}
+
+	maxHID := len(r.handlers) - 1
+	if int(hID) <= maxHID {
+		if h := r.handlers[int(hID)]; h != nil {
+			return h, nil
+		}
+	}
+
+	if r.GlobalHandler != nil {
+		return r.GlobalHandler, nil
+	}
+
+	return nil, fmt.Errorf("handler not found")
 }
 
 func (r *Router) RemoveHandler(hID HandlerID) {
