@@ -834,7 +834,6 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			})))
 
 		type test struct {
-			status    int
 			method    string
 			path      string
 			handlerID uint64
@@ -844,25 +843,21 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			{
 				method:    "POST", // can be any method
 				path:      "/bar/0",
-				status:    http.StatusOK,
 				handlerID: 1,
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/bar/1",
-				status:    http.StatusOK,
 				handlerID: 2,
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/bar/foobar",
-				status:    http.StatusOK,
 				handlerID: 3,
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/bar/rpc.v4",
-				status:    http.StatusOK,
 				handlerID: 4,
 			},
 		}
@@ -901,7 +896,6 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			})))
 
 		type test struct {
-			status    int
 			method    string
 			path      string
 			handlerID uint64
@@ -911,13 +905,11 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			{
 				method:    "POST", // can be any method
 				path:      "/api/v1/foo/bar",
-				status:    http.StatusOK,
 				handlerID: 2,
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/api/something/else",
-				status:    http.StatusOK,
 				handlerID: 1,
 			},
 		}
@@ -955,7 +947,6 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			})))
 
 		type test struct {
-			status    int
 			method    string
 			path      string
 			handlerID uint64
@@ -965,14 +956,250 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 			{
 				method:    "POST", // can be any method
 				path:      "/api/v1/foo/bar",
-				status:    http.StatusOK,
 				handlerID: 1,
 			},
 			{
 				method:    "POST", // can be any method
 				path:      "/api/something/else",
-				status:    http.StatusOK,
 				handlerID: 2,
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				h, error := r.FindHandler(tt.method, tt.path)
+				require.NoError(t, error)
+
+				responseRecorder := httptest.NewRecorder()
+				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+				h.ServerHTTP(responseRecorder, request, nil)
+
+				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
+				require.NoError(t, err)
+				assert.Equal(t, tt.handlerID, uint64(handlerID))
+			})
+		}
+	})
+}
+
+func TestRouter_FindHandler(main *testing.T) {
+	main.Run("FindHandler_UnsupportedMethod", func(t *testing.T) {
+		r := stdrouter.New()
+		_, error := r.FindHandler("UNSUPPORTED", "/")
+		assert.EqualError(t, error, "unsupported method UNSUPPORTED")
+	})
+	main.Run("FindHandler_NotFound", func(t *testing.T) {
+		r := stdrouter.New()
+		_, error := r.FindHandler("GET", "/")
+		assert.EqualError(t, error, "path / not found")
+	})
+	main.Run("FindHandler_OK", func(t *testing.T) {
+		r := stdrouter.New()
+		mockHandler := func(resp string) stdrouter.Handler {
+			return stdrouter.HandlerFunc(func(writer http.ResponseWriter, request *http.Request, params stdrouter.Params) {
+				writer.Write([]byte(resp))
+			})
+		}
+
+		require.NoError(t, r.RegisterHandler("GET", "/get0", mockHandler("1")))
+		require.NoError(t, r.RegisterHandler("GET", "/get1", mockHandler("2")))
+		require.NoError(t, r.RegisterHandler("GET", "/get1/{param}", mockHandler("3")))
+		require.NoError(t, r.RegisterHandler("HEAD", "/head0", mockHandler("11")))
+		require.NoError(t, r.RegisterHandler("HEAD", "/head1", mockHandler("12")))
+		require.NoError(t, r.RegisterHandler("HEAD", "/head1/{param}", mockHandler("13")))
+		require.NoError(t, r.RegisterHandler("POST", "/post0", mockHandler("21")))
+		require.NoError(t, r.RegisterHandler("POST", "/post1", mockHandler("22")))
+		require.NoError(t, r.RegisterHandler("POST", "/post1/{param}", mockHandler("23")))
+		require.NoError(t, r.RegisterHandler("PUT", "/put0", mockHandler("31")))
+		require.NoError(t, r.RegisterHandler("PUT", "/put1", mockHandler("32")))
+		require.NoError(t, r.RegisterHandler("PUT", "/put1/{param}", mockHandler("33")))
+		require.NoError(t, r.RegisterHandler("PATCH", "/patch0", mockHandler("41")))
+		require.NoError(t, r.RegisterHandler("PATCH", "/patch1", mockHandler("42")))
+		require.NoError(t, r.RegisterHandler("PATCH", "/patch1/{param}", mockHandler("43")))
+		require.NoError(t, r.RegisterHandler("DELETE", "/delete0", mockHandler("51")))
+		require.NoError(t, r.RegisterHandler("DELETE", "/delete1", mockHandler("52")))
+		require.NoError(t, r.RegisterHandler("DELETE", "/delete1/{param}", mockHandler("53")))
+		require.NoError(t, r.RegisterHandler("CONNECT", "/connect0", mockHandler("61")))
+		require.NoError(t, r.RegisterHandler("CONNECT", "/connect1", mockHandler("62")))
+		require.NoError(t, r.RegisterHandler("CONNECT", "/connect1/{param}", mockHandler("63")))
+		require.NoError(t, r.RegisterHandler("OPTIONS", "/options0", mockHandler("71")))
+		require.NoError(t, r.RegisterHandler("OPTIONS", "/options1", mockHandler("72")))
+		require.NoError(t, r.RegisterHandler("OPTIONS", "/options1/{param}", mockHandler("73")))
+		require.NoError(t, r.RegisterHandler("TRACE", "/trace0", mockHandler("81")))
+		require.NoError(t, r.RegisterHandler("TRACE", "/trace1", mockHandler("82")))
+		require.NoError(t, r.RegisterHandler("TRACE", "/trace1/{param}", mockHandler("83")))
+		// wildcard param test
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/ANY/foo/car", mockHandler("112")))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/ANY/foo/bar/{*barparam}", mockHandler("111")))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/ANY/foo/{*fooparam}", mockHandler("110")))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/ANY/{*rootparam}", mockHandler("113")))
+
+		type test struct {
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "GET",
+				path:      "/get0",
+				handlerID: 1,
+			},
+			{
+				method:    "GET",
+				path:      "/get1",
+				handlerID: 2,
+			},
+			{
+				method:    "GET",
+				path:      "/get1/foo",
+				handlerID: 3,
+			},
+			{
+				method:    "HEAD",
+				path:      "/head0",
+				handlerID: 11,
+			},
+			{
+				method:    "HEAD",
+				path:      "/head1",
+				handlerID: 12,
+			},
+			{
+				method:    "HEAD",
+				path:      "/head1/foo",
+				handlerID: 13,
+			},
+			{
+				method:    "POST",
+				path:      "/post0",
+				handlerID: 21,
+			},
+			{
+				method:    "POST",
+				path:      "/post1",
+				handlerID: 22,
+			},
+			{
+				method:    "POST",
+				path:      "/post1/foo",
+				handlerID: 23,
+			},
+			{
+				method:    "PUT",
+				path:      "/put0",
+				handlerID: 31,
+			},
+			{
+				method:    "PUT",
+				path:      "/put1",
+				handlerID: 32,
+			},
+			{
+				method:    "PUT",
+				path:      "/put1/foo",
+				handlerID: 33,
+			},
+			{
+				method:    "PATCH",
+				path:      "/patch0",
+				handlerID: 41,
+			},
+			{
+				method:    "PATCH",
+				path:      "/patch1",
+				handlerID: 42,
+			},
+			{
+				method:    "PATCH",
+				path:      "/patch1/foo",
+				handlerID: 43,
+			},
+			{
+				method:    "DELETE",
+				path:      "/delete0",
+				handlerID: 51,
+			},
+			{
+				method:    "DELETE",
+				path:      "/delete1",
+				handlerID: 52,
+			},
+			{
+				method:    "DELETE",
+				path:      "/delete1/foo",
+				handlerID: 53,
+			},
+			{
+				method:    "CONNECT",
+				path:      "/connect0",
+				handlerID: 61,
+			},
+			{
+				method:    "CONNECT",
+				path:      "/connect1",
+				handlerID: 62,
+			},
+			{
+				method:    "CONNECT",
+				path:      "/connect1/foo",
+				handlerID: 63,
+			},
+			{
+				method:    "OPTIONS",
+				path:      "/options0",
+				handlerID: 71,
+			},
+			{
+				method:    "OPTIONS",
+				path:      "/options1",
+				handlerID: 72,
+			},
+			{
+				method:    "OPTIONS",
+				path:      "/options1/foo",
+				handlerID: 73,
+			},
+			{
+				method:    "TRACE",
+				path:      "/trace0",
+				handlerID: 81,
+			},
+			{
+				method:    "TRACE",
+				path:      "/trace1",
+				handlerID: 82,
+			},
+			{
+				method:    "TRACE",
+				path:      "/trace1/foo",
+				handlerID: 83,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/match/by/wildcard",
+				handlerID: 110,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/bar/match/by/wildcard",
+				handlerID: 111,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/foo/car",
+				handlerID: 112,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/ANY/root",
+				handlerID: 113,
 			},
 		}
 
