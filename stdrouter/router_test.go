@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/makasim/httprouter/stdrouter"
@@ -214,14 +215,14 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 
 		tests := []test{
 			{
-				method:    "POST", // can be any method
-				path:      "/api/v1/foo/bar",
-				status:    http.StatusOK,
+				method: "POST", // can be any method
+				path:   "/api/v1/foo/bar",
+				status: http.StatusOK,
 			},
 			{
-				method:    "POST", // can be any method
-				path:      "/api/something/else",
-				status:    http.StatusOK,
+				method: "POST", // can be any method
+				path:   "/api/something/else",
+				status: http.StatusOK,
 			},
 		}
 
@@ -261,14 +262,14 @@ func TestRouter_HandleComplexParametrizedRouting(main *testing.T) {
 
 		tests := []test{
 			{
-				method:    "POST", // can be any method
-				path:      "/api/v1/foo/bar",
-				status:    http.StatusOK,
+				method: "POST", // can be any method
+				path:   "/api/v1/foo/bar",
+				status: http.StatusOK,
 			},
 			{
-				method:    "POST", // can be any method
-				path:      "/api/something/else",
-				status:    http.StatusOK,
+				method: "POST", // can be any method
+				path:   "/api/something/else",
+				status: http.StatusOK,
 			},
 		}
 
@@ -808,4 +809,191 @@ func TestRouter_Delete(t *testing.T) {
 	rw = httptest.NewRecorder()
 	r.ServeHTTP(rw, req)
 	require.Equal(t, http.StatusNotFound, rw.Result().StatusCode)
+}
+
+func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
+	main.Run("WhenParametrizedRouteAfterSimpleRoutes_OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/bar/0", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("1"))
+			})))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/bar/1", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("2"))
+			})))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/bar/{param}", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("3"))
+			})))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/bar/rpc.{*param}", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("4"))
+			})))
+
+		type test struct {
+			status    int
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/0",
+				status:    http.StatusOK,
+				handlerID: 1,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/1",
+				status:    http.StatusOK,
+				handlerID: 2,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/foobar",
+				status:    http.StatusOK,
+				handlerID: 3,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/bar/rpc.v4",
+				status:    http.StatusOK,
+				handlerID: 4,
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				h, error := r.FindHandler(tt.method, tt.path)
+				require.NoError(t, error)
+
+				responseRecorder := httptest.NewRecorder()
+				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+				h.ServerHTTP(responseRecorder, request, nil)
+
+				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
+				require.NoError(t, err)
+				assert.Equal(t, tt.handlerID, uint64(handlerID))
+			})
+		}
+	})
+	main.Run("WhenParametrizedRouteRegisteredBefore_OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		// wildcard param test
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/api/{*path}", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("1"))
+			})))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/api/v1/foo/bar", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("2"))
+			})))
+
+		type test struct {
+			status    int
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/api/v1/foo/bar",
+				status:    http.StatusOK,
+				handlerID: 2,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/api/something/else",
+				status:    http.StatusOK,
+				handlerID: 1,
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				h, error := r.FindHandler(tt.method, tt.path)
+				require.NoError(t, error)
+
+				responseRecorder := httptest.NewRecorder()
+				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+				h.ServerHTTP(responseRecorder, request, nil)
+
+				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
+				require.NoError(t, err)
+				assert.Equal(t, tt.handlerID, uint64(handlerID))
+			})
+		}
+	})
+	main.Run("WhenParametrizedRouteRegisteredAfter_OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/api/v1/foo/bar", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("1"))
+			})))
+		require.NoError(t, r.RegisterHandler(stdrouter.MethodAny, "/api/{*path}", stdrouter.HandlerFunc(
+			func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+				rw.Write([]byte("2"))
+			})))
+
+		type test struct {
+			status    int
+			method    string
+			path      string
+			handlerID uint64
+		}
+
+		tests := []test{
+			{
+				method:    "POST", // can be any method
+				path:      "/api/v1/foo/bar",
+				status:    http.StatusOK,
+				handlerID: 1,
+			},
+			{
+				method:    "POST", // can be any method
+				path:      "/api/something/else",
+				status:    http.StatusOK,
+				handlerID: 2,
+			},
+		}
+
+		r.GlobalHandler = stdrouter.HandlerFunc(func(rw http.ResponseWriter, req *http.Request, params stdrouter.Params) {
+			rw.WriteHeader(http.StatusOK)
+		})
+
+		for _, tt := range tests {
+			tt := tt
+			t.Run(fmt.Sprintf("%s-%d", tt.method, tt.handlerID), func(t *testing.T) {
+				h, error := r.FindHandler(tt.method, tt.path)
+				require.NoError(t, error)
+
+				responseRecorder := httptest.NewRecorder()
+				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
+				h.ServerHTTP(responseRecorder, request, nil)
+
+				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
+				require.NoError(t, err)
+				assert.Equal(t, tt.handlerID, uint64(handlerID))
+			})
+		}
+	})
 }

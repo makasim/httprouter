@@ -173,7 +173,7 @@ func (r *Router) AddHandler(handler Handler) HandlerID {
 	return HandlerID(id)
 }
 
-func (r *Router) FindHandler(path, method string) (Handler, error) {
+func (r *Router) FindHandler(method, path string) (Handler, error) {
 	i := methodIndexOf(method)
 	if i == -1 {
 		return nil, fmt.Errorf("unsupported method %v", method)
