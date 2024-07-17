@@ -10,12 +10,12 @@ import (
 )
 
 type Handler interface {
-	ServerHTTP(http.ResponseWriter, *http.Request, Params)
+	ServeHTTP(http.ResponseWriter, *http.Request, Params)
 }
 
 type HandlerFunc func(http.ResponseWriter, *http.Request, Params)
 
-func (f HandlerFunc) ServerHTTP(rw http.ResponseWriter, r *http.Request, p Params) {
+func (f HandlerFunc) ServeHTTP(rw http.ResponseWriter, r *http.Request, p Params) {
 	f(rw, r, p)
 }
 
@@ -139,14 +139,14 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	maxHID := len(r.handlers) - 1
 	if int(hID) <= maxHID {
 		if h := r.handlers[int(hID)]; h != nil {
-			h.ServerHTTP(rw, req, *ps)
+			h.ServeHTTP(rw, req, *ps)
 			return
 		}
 	}
 
 	if r.GlobalHandler != nil {
 
-		r.GlobalHandler.ServerHTTP(rw, req, *ps)
+		r.GlobalHandler.ServeHTTP(rw, req, *ps)
 		return
 	}
 
