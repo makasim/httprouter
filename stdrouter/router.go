@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"sync"
 
 	"github.com/makasim/httprouter/radix"
@@ -205,6 +206,17 @@ func (r *Router) FindHandler(method, path string) (Handler, error) {
 func (r *Router) RemoveHandler(hID HandlerID) {
 	r.handlers[hID] = nil
 	r.freeHandlerIds = append(r.freeHandlerIds, hID)
+}
+
+func (r *Router) GetHandler(hID HandlerID) (Handler, error) {
+	if slices.Contains(r.freeHandlerIds, hID) {
+		return nil, fmt.Errorf("handler not found")
+	}
+	if hID < 1 || int(hID) >= len(r.handlers) {
+		return nil, fmt.Errorf("handler not found")
+	}
+
+	return r.handlers[hID], nil
 }
 
 func (r *Router) AddStdHandler(handler http.Handler) HandlerID {
