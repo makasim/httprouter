@@ -29,13 +29,31 @@ type Param struct {
 
 type Params []Param
 
-func (ps Params) ByName(name string) string {
+func (ps Params) Get(name string) string {
 	for _, p := range ps {
 		if p.Key == name {
 			return p.Value
 		}
 	}
 	return ""
+}
+
+func (ps *Params) Set(name, value string) {
+	if value == "" {
+		return
+	}
+
+	for i, p := range *ps {
+		if p.Key == name {
+			(*ps)[i].Value = value
+			return
+		}
+	}
+
+	*ps = append(*ps, Param{
+		Key:   name,
+		Value: value,
+	})
 }
 
 type paramsKey struct{}

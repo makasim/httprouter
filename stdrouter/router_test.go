@@ -1293,3 +1293,15 @@ func TestRouter_GetHandler(main *testing.T) {
 		require.Nil(t, h)
 	})
 }
+
+func TestParams(t *testing.T) {
+	ps := make(stdrouter.Params, 0)
+	ps.Set("key1", "value1")
+	ps.Set("key2", "value2")
+	ps.Set("key3", "")
+
+	require.Len(t, ps, 2)
+	require.Equal(t, "value1", ps.Get("key1"))
+	require.Equal(t, "value2", ps.Get("key2"))
+	require.Equal(t, "", ps.Get("key3"))
+}
