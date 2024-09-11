@@ -874,7 +874,7 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 
 				responseRecorder := httptest.NewRecorder()
 				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-				h.ServerHTTP(responseRecorder, request, nil)
+				h.ServeHTTP(responseRecorder, request, nil)
 
 				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
 				require.NoError(t, err)
@@ -926,7 +926,7 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 
 				responseRecorder := httptest.NewRecorder()
 				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-				h.ServerHTTP(responseRecorder, request, nil)
+				h.ServeHTTP(responseRecorder, request, nil)
 
 				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
 				require.NoError(t, err)
@@ -977,7 +977,7 @@ func TestRouter_FindHandler_HandleComplexParametrizedRouting(main *testing.T) {
 
 				responseRecorder := httptest.NewRecorder()
 				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-				h.ServerHTTP(responseRecorder, request, nil)
+				h.ServeHTTP(responseRecorder, request, nil)
 
 				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
 				require.NoError(t, err)
@@ -1009,7 +1009,7 @@ func TestRouter_FindHandler(main *testing.T) {
 
 		responseRecorder := httptest.NewRecorder()
 		request := httptest.NewRequest("GET", "/bar", http.NoBody)
-		h.ServerHTTP(responseRecorder, request, nil)
+		h.ServeHTTP(responseRecorder, request, nil)
 		assert.Equal(t, http.StatusOK, responseRecorder.Result().StatusCode)
 	})
 	main.Run("FindHandler_OK", func(t *testing.T) {
@@ -1229,12 +1229,67 @@ func TestRouter_FindHandler(main *testing.T) {
 
 				responseRecorder := httptest.NewRecorder()
 				request := httptest.NewRequest(tt.method, tt.path, http.NoBody)
-				h.ServerHTTP(responseRecorder, request, nil)
+				h.ServeHTTP(responseRecorder, request, nil)
 
 				handlerID, err := strconv.Atoi(responseRecorder.Body.String())
 				require.NoError(t, err)
 				assert.Equal(t, tt.handlerID, uint64(handlerID))
 			})
 		}
+	})
+}
+
+func TestRouter_GetHandler(main *testing.T) {
+	main.Run("EmptyRouter", func(t *testing.T) {
+		r := stdrouter.New()
+
+		h, err := r.GetHandler(0)
+		require.EqualError(t, err, `handler not found`)
+		require.Nil(t, h)
+
+		h, err = r.GetHandler(1)
+		require.EqualError(t, err, `handler not found`)
+		require.Nil(t, h)
+
+		h, err = r.GetHandler(-1)
+		require.EqualError(t, err, `handler not found`)
+		require.Nil(t, h)
+
+		h, err = r.GetHandler(123456)
+		require.EqualError(t, err, `handler not found`)
+		require.Nil(t, h)
+	})
+
+	main.Run("OK", func(t *testing.T) {
+		r := stdrouter.New()
+
+		h0 := stdrouter.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request, _ stdrouter.Params) {
+		})
+		hID0 := r.AddHandler(h0)
+
+		h1 := stdrouter.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request, _ stdrouter.Params) {
+		})
+		hID1 := r.AddHandler(h1)
+
+		actH0, err := r.GetHandler(hID0)
+		require.NoError(t, err)
+		require.NotNil(t, actH0)
+
+		actH1, err := r.GetHandler(hID1)
+		require.NoError(t, err)
+		require.NotNil(t, actH1)
+	})
+
+	main.Run("Removed", func(t *testing.T) {
+		r := stdrouter.New()
+
+		h0 := stdrouter.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request, _ stdrouter.Params) {
+		})
+		hID0 := r.AddHandler(h0)
+		r.RemoveHandler(hID0)
+
+		h, err := r.GetHandler(hID0)
+		require.EqualError(t, err, `handler not found`)
+		require.Nil(t, h)
 	})
 }
