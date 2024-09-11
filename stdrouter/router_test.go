@@ -1298,8 +1298,14 @@ func TestParams(t *testing.T) {
 	ps := make(stdrouter.Params, 0)
 	ps.Set("key1", "value1")
 	ps.Set("key2", "value2")
-	ps.Set("key3", "")
+	ps.Set("key3", "value3")
 
+	require.Len(t, ps, 3)
+	require.Equal(t, "value1", ps.Get("key1"))
+	require.Equal(t, "value2", ps.Get("key2"))
+	require.Equal(t, "value3", ps.Get("key3"))
+
+	ps.Set("key3", "")
 	require.Len(t, ps, 2)
 	require.Equal(t, "value1", ps.Get("key1"))
 	require.Equal(t, "value2", ps.Get("key2"))
