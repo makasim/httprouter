@@ -40,6 +40,12 @@ func (ps Params) Get(name string) string {
 
 func (ps *Params) Set(name, value string) {
 	if value == "" {
+		for i, p := range *ps {
+			if p.Key == name {
+				*ps = append((*ps)[:i], (*ps)[i+1:]...)
+			}
+		}
+
 		return
 	}
 
