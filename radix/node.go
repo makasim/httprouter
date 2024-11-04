@@ -2,6 +2,7 @@ package radix
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,7 @@ type Node struct {
 }
 
 func (n Node) Insert(path string, key uint64) Node {
+	log.Println("Insert", path, key)
 	if path == "" {
 		panic("insert: path empty")
 	}
@@ -91,6 +93,7 @@ func (n Node) Insert(path string, key uint64) Node {
 
 		if findParamStart(path) == 0 {
 			pn, _ := n.paramNode()
+			log.Println("findParamStart", path, "pn", pn)
 			n = n.setParamNode(updateParamNode(pn, path, key))
 			return n
 		}
