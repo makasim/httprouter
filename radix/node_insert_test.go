@@ -532,6 +532,42 @@ func TestNode_InsertDynamic(main *testing.T) {
 				},
 			},
 		},
+		"AddTwoParamsIntoOneParam": {
+			node: Node{
+				path: "/",
+				children: []Node{
+					{
+						kind: param,
+						path: "{foo}",
+						key:  1,
+					},
+				},
+			},
+			insertPath: "/{foo}/{bar}",
+			insertKey:  3,
+			expected: Node{
+				path: "/",
+				children: []Node{
+					{
+						kind: param,
+						path: "{foo}",
+						key:  1,
+						children: []Node{
+							{
+								path: "/",
+								children: []Node{
+									{
+										kind: param,
+										path: "{bar}",
+										key:  3,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 		"Wildcard": {
 			node:       Node{},
 			insertPath: "/{*foo}",
@@ -663,6 +699,21 @@ func TestNode_InsertConflict(main *testing.T) {
 				},
 			},
 			insertPath:  "/foo/{another}",
+			insertKey:   2,
+			expectedErr: ErrParamNameConflict,
+		},
+		"AddTwoParamsIntoOneParam": {
+			node: Node{
+				path: "/",
+				children: []Node{
+					{
+						kind: param,
+						path: "{foo}",
+						key:  1,
+					},
+				},
+			},
+			insertPath:  "/{anotherName}/{bar}",
 			insertKey:   2,
 			expectedErr: ErrParamNameConflict,
 		},
